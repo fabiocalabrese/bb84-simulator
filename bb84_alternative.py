@@ -3,6 +3,30 @@ import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 
+
+def bb84_banner():
+    print("\n=== BB84 Quantum Key Distribution Simulator ===")
+    print("A cura di Fabio Calabrese (fabiocalabrese88@gmail.com)\n")
+
+    alice_bits = [0, 1, 1, 0, 1]
+    alice_bases = ['+', 'x', '+', 'x', '+']
+    bob_bases = ['+', '+', '+', 'x', 'x']
+
+    print("Alice bits:   ", ' '.join(str(b) for b in alice_bits))
+    print("Alice bases:  ", ' '.join(alice_bases))
+    print("Bob bases:    ", ' '.join(bob_bases))
+
+    # Mostra quali basi coincidono
+    mask = [a == b for a, b in zip(alice_bases, bob_bases)]
+    coincidences = ['✓' if m else ' ' for m in mask]
+    print("Coincidenze:  ", ' '.join(coincidences))
+    print("\nLegenda: '+' = base rettilinea, 'x' = base diagonale, '✓' = base coincidente")
+    print("-----------------------------------------------------------\n")
+
+
+
+
+
 # ---------------- FUNZIONI BB84 ----------------
 def generate_bit(n):
     return np.random.randint(0, 2, size=n, dtype=np.int8)
@@ -60,11 +84,30 @@ def simulate_bb84(n, sample_size, eve_active=False, channel_error=0.0):
     return error_rate
 
 # ---------------- SIMULAZIONE MULTIPLA ----------------
-n = 4000
-sample_size = 2000
-runs = 1000
-channel_errors = np.linspace(0, 0.2, 9)  # valori di errore del canale
+bb84_banner()
+# ---------------- INPUT PARAMETRI ----------------
+try:
+    n = int(input("Inserisci il numero di bit per run (es. 100): "))
+    sample_size = int(input("Inserisci la dimensione del campione per stima errore (es. 10): "))
+    runs = int(input("Inserisci il numero di run per ciascun channel_error (es. 500): "))
+    channel_errors_input = input("Inserisci i valori di channel_error separati da virgola (es. 0,0.01,0.05,0.1,0.2): ")
+    channel_errors = [float(x.strip()) for x in channel_errors_input.split(",")]
+    eve_choice = input("Vuoi attivare Eve? (si/no): ").strip().lower()
+    eve_active = True if eve_choice == "si" else False
+except ValueError:
+    print("Input non valido, si utilizzano parametri di default.")
+    n = 100
+    sample_size = 10
+    runs = 500
+    channel_errors = [0, 0.01, 0.05, 0.1, 0.2]
+    eve_active = False
 
+print(f"\nSimulazione pronta con i seguenti parametri:")
+print(f"- Numero di bit: {n}")
+print(f"- Dimensione campione: {sample_size}")
+print(f"- Numero di run: {runs}")
+print(f"- Channel errors: {channel_errors}")
+print(f"- Eve attiva: {eve_active}\n")
 # Salvo medie e deviazioni standard
 error_mean_eve_off = []
 error_std_eve_off = []
