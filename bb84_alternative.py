@@ -1,114 +1,132 @@
 import numpy as np
+import matplotlib
+matplotlib.use("TkAgg")
+import matplotlib.pyplot as plt
 
-# ---------------- FUNZIONI BASE ----------------
+# ---------------- FUNZIONI BB84 ----------------
 def generate_bit(n):
-    """Genera n bit casuali 0 o 1"""
     return np.random.randint(0, 2, size=n, dtype=np.int8)
 
 def generate_basis(n):
-    """Genera n basi casuali 0 o 1"""
     return np.random.randint(0, 2, size=n, dtype=np.int8)
 
 def noisy_channel(bits, error_prob=0.0):
-    """Applica rumore casuale alla trasmissione dei bit"""
-    if error_prob <= 0:
-        return bits.copy()
     flips = np.random.rand(len(bits)) < error_prob
     return np.bitwise_xor(bits, flips.astype(np.int8))
 
-# ---------------- INTERCETTAZIONE ----------------
 def interception(alice_bits, alice_basis, n, eve_active=True):
-    """
-    Eve intercetta i bit solo se eve_active=True.
-    Restituisce i bit misurati da Eve e le sue basi.
-    """
     if not eve_active:
-        return alice_bits.copy(), alice_basis.copy()  # nessuna intercettazione
-
+        return alice_bits.copy(), alice_basis.copy()
     eve_basis = generate_basis(n)
     random_bits = np.random.randint(0, 2, size=n, dtype=np.int8)
-    # Eve misura correttamente solo se la sua base coincide con quella di Alice
     eve_measures = np.where(eve_basis == alice_basis, alice_bits, random_bits)
     return eve_measures, eve_basis
 
-# ---------------- RICEZIONE BOB ----------------
 def bob_receive(sent_bits, sender_basis, n, error_prob=0.0):
-    """
-    Bob riceve i bit trasmessi.
-    - sent_bits: bit inviati dal mittente (Alice o Eve)
-    - sender_basis: basi usate dal mittente reale
-    """
     bob_basis = generate_basis(n)
     random_bits = np.random.randint(0, 2, size=n, dtype=np.int8)
-    # Bob misura correttamente solo se le basi coincidono
     bob_measure = np.where(bob_basis == sender_basis, sent_bits, random_bits)
-    # applica rumore sul canale
     bob_measure = noisy_channel(bob_measure, error_prob)
     return bob_measure, bob_basis
 
-# ---------------- SIFTING DELLA CHIAVE ----------------
 def sift_key(alice_bits, alice_basis, bob_bits, bob_basis):
-    """Mantiene solo i bit dove le basi coincidono"""
     mask = alice_basis == bob_basis
     alice_key = alice_bits[mask]
     bob_key = bob_bits[mask]
-    discarded = np.sum(~mask)
-    return alice_key, bob_key, discarded
+    return alice_key, bob_key
 
-# ---------------- CAMPIONE PER STIMA ERRORE ----------------
 def sample_and_estimate_error(alice_key, bob_key, sample_size):
     n = len(alice_key)
     if n <= sample_size:
-        sample_size = n // 2  # metà della chiave se molto piccola
-
+        sample_size = n // 2
     permutation = np.random.permutation(n)
     alice_perm = alice_key[permutation]
     bob_perm = bob_key[permutation]
-
-    sample_indices = np.arange(sample_size)
-    alice_sample = alice_perm[sample_indices]
-    bob_sample = bob_perm[sample_indices]
-
+    alice_sample = alice_perm[:sample_size]
+    bob_sample = bob_perm[:sample_size]
     errors = np.sum(alice_sample != bob_sample)
-    error_rate = errors / sample_size
+    return errors / sample_size if sample_size > 0 else 0
 
-    remaining_indices = np.arange(sample_size, n)
-    alice_remaining = alice_perm[remaining_indices]
-    bob_remaining = bob_perm[remaining_indices]
-
-    return error_rate, alice_remaining, bob_remaining, alice_sample, bob_sample
-
-# ---------------- MAIN ----------------
-if __name__ == "__main__":
-    n = 20000            # numero di bit iniziali
-    sample_size = 8000     # campione per stima dell'errore
-    eve_active = False    # True = Eve intercetta, False = nessuna intercettazione
-    channel_error = 0.000 # probabilità di bit flip casuale sul canale
-
-    # --- Alice genera bit e basi ---
+# ---------------- FUNZIONE DI SIMULAZIONE ----------------
+def simulate_bb84(n, sample_size, eve_active=False, channel_error=0.0):
     alice_bits = generate_bit(n)
     alice_basis = generate_basis(n)
 
-    # --- Trasmissione: Eve intercetta (opzionale) ---
     transmitted_bits, sender_basis = interception(alice_bits, alice_basis, n, eve_active)
-
-    # --- Bob riceve i bit ---
     bob_bits, bob_basis = bob_receive(transmitted_bits, sender_basis, n, error_prob=channel_error)
 
-    # --- Sifting: mantieni solo bit dove basi coincidono ---
-    alice_key, bob_key, discarded = sift_key(alice_bits, alice_basis, bob_bits, bob_basis)
+    alice_key, bob_key = sift_key(alice_bits, alice_basis, bob_bits, bob_basis)
+    error_rate = sample_and_estimate_error(alice_key, bob_key, sample_size)
+    return error_rate
 
-    # --- Stima errore su un campione ---
-    error_rate, alice_rem, bob_rem, alice_sample, bob_sample = sample_and_estimate_error(
-        alice_key, bob_key, sample_size
-    )
+# ---------------- SIMULAZIONE MULTIPLA ----------------
+n = 4000
+sample_size = 2000
+runs = 1000
+channel_errors = np.linspace(0, 0.2, 9)  # valori di errore del canale
 
-    # --- STAMPA RISULTATI ---
-    '''print("Alice chiave siftata: ", alice_key)
-    print("Bob chiave siftata:   ", bob_key)
-    print("Campione Alice:       ", alice_sample)
-    print("Campione Bob:         ", bob_sample)
-    print("Chiave rimanente Alice:", alice_rem)
-    print("Chiave rimanente Bob:  ", bob_rem)
-    print("Bit scartati:", discarded)'''
-    print("Errore stimato: {:.4f}".format(error_rate))
+# Salvo medie e deviazioni standard
+error_mean_eve_off = []
+error_std_eve_off = []
+error_mean_eve_on = []
+error_std_eve_on = []
+
+# Salvo anche gli ultimi errori per gli istogrammi
+errors_off_final = []
+errors_on_final = []
+
+
+for ce in channel_errors:
+    # Eve disattiva
+    errors_off = [simulate_bb84(n, sample_size, eve_active=False, channel_error=ce) for _ in range(runs)]
+    error_mean_eve_off.append(np.mean(errors_off))
+    error_std_eve_off.append(np.std(errors_off))
+    if ce == channel_errors[-1]:
+        errors_off_final = errors_off  # salva per istogramma
+
+    # Eve attiva
+    errors_on = [simulate_bb84(n, sample_size, eve_active=True, channel_error=ce) for _ in range(runs)]
+    error_mean_eve_on.append(np.mean(errors_on))
+    error_std_eve_on.append(np.std(errors_on))
+    if ce == channel_errors[-1]:
+        errors_on_final = errors_on  # salva per istogramma
+
+# ---------------- LINE PLOT CON BANDA ±σ ----------------
+
+plt.figure(figsize=(8, 5))
+
+# Eve off
+mean_off = np.array(error_mean_eve_off)
+std_off = np.array(error_std_eve_off)
+plt.plot(channel_errors, mean_off, marker='o', label="Eve off")
+plt.fill_between(channel_errors, mean_off - std_off, mean_off + std_off, color='skyblue', alpha=0.3)
+
+# Eve on
+mean_on = np.array(error_mean_eve_on)
+std_on = np.array(error_std_eve_on)
+plt.plot(channel_errors, mean_on, marker='o', label="Eve on")
+plt.fill_between(channel_errors, mean_on - std_on, mean_on + std_on, color='salmon', alpha=0.3)
+
+plt.xlabel("Probabilità di errore del canale")
+plt.ylabel("Errore medio stimato")
+plt.title("Errore stimato nel BB84 in funzione del rumore del canale")
+plt.grid(True)
+plt.legend()
+plt.show()
+# ---------------- ISTOGRAMMI FINALI ----------------
+plt.figure(figsize=(12,5))
+
+plt.subplot(1,2,1)
+plt.hist(errors_off_final, bins=30, color='skyblue', edgecolor='black')
+plt.title("Distribuzione errore Eve off (c.e = 0.2)")
+plt.xlabel("Errore stimato")
+plt.ylabel("Frequenza")
+
+plt.subplot(1,2,2)
+plt.hist(errors_on_final, bins=30, color='salmon', edgecolor='black')
+plt.title("Distribuzione errore Eve on (c.e = 0.2)")
+plt.xlabel("Errore stimato")
+plt.ylabel("Frequenza")
+
+plt.tight_layout()
+plt.show()
