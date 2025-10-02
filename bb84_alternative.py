@@ -8,24 +8,6 @@ def bb84_banner():
     print("\n=== BB84 Quantum Key Distribution Simulator ===")
     print("A cura di Fabio Calabrese (fabiocalabrese88@gmail.com)\n")
 
-    alice_bits = [0, 1, 1, 0, 1]
-    alice_bases = ['+', 'x', '+', 'x', '+']
-    bob_bases = ['+', '+', '+', 'x', 'x']
-
-    print("Alice bits:   ", ' '.join(str(b) for b in alice_bits))
-    print("Alice bases:  ", ' '.join(alice_bases))
-    print("Bob bases:    ", ' '.join(bob_bases))
-
-    # Mostra quali basi coincidono
-    mask = [a == b for a, b in zip(alice_bases, bob_bases)]
-    coincidences = ['✓' if m else ' ' for m in mask]
-    print("Coincidenze:  ", ' '.join(coincidences))
-    print("\nLegenda: '+' = base rettilinea, 'x' = base diagonale, '✓' = base coincidente")
-    print("-----------------------------------------------------------\n")
-
-
-
-
 
 # ---------------- FUNZIONI BB84 ----------------
 def generate_bit(n):
@@ -71,6 +53,7 @@ def sample_and_estimate_error(alice_key, bob_key, sample_size):
     errors = np.sum(alice_sample != bob_sample)
     return errors / sample_size if sample_size > 0 else 0
 
+
 # ---------------- FUNZIONE DI SIMULAZIONE ----------------
 def simulate_bb84(n, sample_size, eve_active=False, channel_error=0.0):
     alice_bits = generate_bit(n)
@@ -81,18 +64,21 @@ def simulate_bb84(n, sample_size, eve_active=False, channel_error=0.0):
 
     alice_key, bob_key = sift_key(alice_bits, alice_basis, bob_bits, bob_basis)
     error_rate = sample_and_estimate_error(alice_key, bob_key, sample_size)
-    return error_rate
+
+    key_length = len(alice_key)  # aggiungo la lunghezza della chiave siftata
+
+    return error_rate, key_length
+
 
 # ---------------- SIMULAZIONE MULTIPLA ----------------
 bb84_banner()
-# ---------------- INPUT PARAMETRI ----------------
+
 try:
     n = int(input("Inserisci il numero di bit per run (es. 100): "))
     sample_size = int(input("Inserisci la dimensione del campione per stima errore (es. 10): "))
     runs = int(input("Inserisci il numero di run per ciascun channel_error (es. 500): "))
     channel_errors_input = input("Inserisci i valori di channel_error separati da virgola (es. 0,0.01,0.05,0.1,0.2): ")
     channel_errors = [float(x.strip()) for x in channel_errors_input.split(",")]
-
 except ValueError:
     print("Input non valido, si utilizzano parametri di default.")
     n = 100
@@ -105,54 +91,83 @@ print(f"- Numero di bit: {n}")
 print(f"- Dimensione campione: {sample_size}")
 print(f"- Numero di run: {runs}")
 print(f"- Channel errors: {channel_errors}")
-# Salvo medie e deviazioni standard
-error_mean_eve_off = []
-error_std_eve_off = []
-error_mean_eve_on = []
-error_std_eve_on = []
 
-# Salvo anche gli ultimi errori per gli istogrammi
-errors_off_final = []
-errors_on_final = []
+# Risultati (errori e lunghezze)
+error_mean_eve_off, error_std_eve_off = [], []
+error_mean_eve_on, error_std_eve_on = [], []
+length_mean_eve_off, length_std_eve_off = [], []
+length_mean_eve_on, length_std_eve_on = [], []
 
 
 for ce in channel_errors:
-    # Eve disattiva
-    errors_off = [simulate_bb84(n, sample_size, eve_active=False, channel_error=ce) for _ in range(runs)]
+    # Eve OFF
+    results_off = [simulate_bb84(n, sample_size, eve_active=False, channel_error=ce) for _ in range(runs)]
+    errors_off = [r[0] for r in results_off]
+    lengths_off = [r[1] for r in results_off]
     error_mean_eve_off.append(np.mean(errors_off))
     error_std_eve_off.append(np.std(errors_off))
+    length_mean_eve_off.append(np.mean(lengths_off))
+    length_std_eve_off.append(np.std(lengths_off))
     if ce == channel_errors[-1]:
         errors_off_final = errors_off  # salva per istogramma
 
-    # Eve attiva
-    errors_on = [simulate_bb84(n, sample_size, eve_active=True, channel_error=ce) for _ in range(runs)]
+    # Eve ON
+    results_on = [simulate_bb84(n, sample_size, eve_active=True, channel_error=ce) for _ in range(runs)]
+    errors_on = [r[0] for r in results_on]
+    lengths_on = [r[1] for r in results_on]
     error_mean_eve_on.append(np.mean(errors_on))
     error_std_eve_on.append(np.std(errors_on))
+    length_mean_eve_on.append(np.mean(lengths_on))
+    length_std_eve_on.append(np.std(lengths_on))
     if ce == channel_errors[-1]:
         errors_on_final = errors_on  # salva per istogramma
 
-# ---------------- LINE PLOT CON BANDA ±σ ----------------
 
+# ---------------- GRAFICO 1: QBER ----------------
 plt.figure(figsize=(8, 5))
 
-# Eve off
 mean_off = np.array(error_mean_eve_off)
 std_off = np.array(error_std_eve_off)
 plt.plot(channel_errors, mean_off, marker='o', label="Eve off")
 plt.fill_between(channel_errors, mean_off - std_off, mean_off + std_off, color='skyblue', alpha=0.3)
 
-# Eve on
 mean_on = np.array(error_mean_eve_on)
 std_on = np.array(error_std_eve_on)
 plt.plot(channel_errors, mean_on, marker='o', label="Eve on")
 plt.fill_between(channel_errors, mean_on - std_on, mean_on + std_on, color='salmon', alpha=0.3)
 
+# Linee teoriche
+plt.plot(channel_errors, channel_errors, 'k--', label="QBER teorico (rumore)")
+plt.axhline(0.25, color='gray', linestyle=':', label="QBER teorico Eve (25%)")
+
 plt.xlabel("Probabilità di errore del canale")
-plt.ylabel("Errore medio stimato")
-plt.title("Errore stimato nel BB84 in funzione del rumore del canale")
+plt.ylabel("Errore medio stimato (QBER)")
+plt.title("QBER stimato nel BB84 in funzione del rumore del canale")
 plt.grid(True)
 plt.legend()
 plt.show()
+
+
+# ---------------- GRAFICO 2: LUNGHEZZA CHIAVE ----------------
+plt.figure(figsize=(8, 5))
+
+mean_len_off = np.array(length_mean_eve_off)
+std_len_off = np.array(length_std_eve_off)
+plt.plot(channel_errors, mean_len_off, marker='o', label="Eve off")
+plt.fill_between(channel_errors, mean_len_off - std_len_off, mean_len_off + std_len_off, color='skyblue', alpha=0.3)
+
+mean_len_on = np.array(length_mean_eve_on)
+std_len_on = np.array(length_std_eve_on)
+plt.plot(channel_errors, mean_len_on, marker='o', label="Eve on")
+plt.fill_between(channel_errors, mean_len_on - std_len_on, mean_len_on + std_len_on, color='salmon', alpha=0.3)
+
+plt.xlabel("Probabilità di errore del canale")
+plt.ylabel("Lunghezza media chiave siftata")
+plt.title("Lunghezza chiave residua in funzione del rumore del canale")
+plt.grid(True)
+plt.legend()
+plt.show()
+
 # ---------------- ISTOGRAMMI FINALI ----------------
 plt.figure(figsize=(12,5))
 
