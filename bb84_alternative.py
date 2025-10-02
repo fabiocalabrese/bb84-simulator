@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
+import csv
 
 
 def bb84_banner():
@@ -20,13 +21,31 @@ def noisy_channel(bits, error_prob=0.0):
     flips = np.random.rand(len(bits)) < error_prob
     return np.bitwise_xor(bits, flips.astype(np.int8))
 
-def interception(alice_bits, alice_basis, n, eve_active=True):
-    if not eve_active:
+def interception_partial(alice_bits, alice_basis, n, eve_active=True, p_eve=1.0):
+    """
+    Intercetta solo una frazione dei bit (intercept-resend).
+    - p_eve: frazione intercettata (0.0..1.0)
+    Restituisce: (transmitted_bits, sender_basis)
+    """
+    if not eve_active or p_eve <= 0:
         return alice_bits.copy(), alice_basis.copy()
+
+    # maschera di intercettazione (True = Eve intercetta)
+    mask = np.random.rand(n) < p_eve
     eve_basis = generate_basis(n)
-    random_bits = np.random.randint(0, 2, size=n, dtype=np.int8)
-    eve_measures = np.where(eve_basis == alice_basis, alice_bits, random_bits)
-    return eve_measures, eve_basis
+    transmitted = alice_bits.copy()
+    rand_bits = np.random.randint(0, 2, size=n, dtype=np.int8)
+
+    idx = np.where(mask)[0]
+    if idx.size > 0:
+        same_base = eve_basis[idx] == alice_basis[idx]
+        transmitted[idx[same_base]] = alice_bits[idx[same_base]]
+        transmitted[idx[~same_base]] = rand_bits[idx[~same_base]]
+
+    sender_basis = alice_basis.copy()
+    sender_basis[mask] = eve_basis[mask]
+
+    return transmitted, sender_basis
 
 def bob_receive(sent_bits, sender_basis, n, error_prob=0.0):
     bob_basis = generate_basis(n)
@@ -55,17 +74,17 @@ def sample_and_estimate_error(alice_key, bob_key, sample_size):
 
 
 # ---------------- FUNZIONE DI SIMULAZIONE ----------------
-def simulate_bb84(n, sample_size, eve_active=False, channel_error=0.0):
+def simulate_bb84(n, sample_size, eve_active=False, channel_error=0.0, p_eve=1.0):
     alice_bits = generate_bit(n)
     alice_basis = generate_basis(n)
 
-    transmitted_bits, sender_basis = interception(alice_bits, alice_basis, n, eve_active)
+    transmitted_bits, sender_basis = interception_partial(alice_bits, alice_basis, n,
+                                                          eve_active=eve_active, p_eve=p_eve)
     bob_bits, bob_basis = bob_receive(transmitted_bits, sender_basis, n, error_prob=channel_error)
 
     alice_key, bob_key = sift_key(alice_bits, alice_basis, bob_bits, bob_basis)
     error_rate = sample_and_estimate_error(alice_key, bob_key, sample_size)
-
-    key_length = len(alice_key)  # aggiungo la lunghezza della chiave siftata
+    key_length = len(alice_key)
 
     return error_rate, key_length
 
@@ -79,18 +98,21 @@ try:
     runs = int(input("Inserisci il numero di run per ciascun channel_error (es. 500): "))
     channel_errors_input = input("Inserisci i valori di channel_error separati da virgola (es. 0,0.01,0.05,0.1,0.2): ")
     channel_errors = [float(x.strip()) for x in channel_errors_input.split(",")]
+    p_eve = float(input("Inserisci la frazione di intercettazione di Eve (es. 1.0 = 100%, 0.5 = 50%): "))
 except ValueError:
     print("Input non valido, si utilizzano parametri di default.")
     n = 100
     sample_size = 10
     runs = 500
     channel_errors = [0, 0.01, 0.05, 0.1, 0.2]
+    p_eve = 1.0
 
 print(f"\nSimulazione pronta con i seguenti parametri:")
 print(f"- Numero di bit: {n}")
 print(f"- Dimensione campione: {sample_size}")
 print(f"- Numero di run: {runs}")
 print(f"- Channel errors: {channel_errors}")
+print(f"- Frazione intercettata da Eve: {p_eve}")
 
 # Risultati (errori e lunghezze)
 error_mean_eve_off, error_std_eve_off = [], []
@@ -98,10 +120,9 @@ error_mean_eve_on, error_std_eve_on = [], []
 length_mean_eve_off, length_std_eve_off = [], []
 length_mean_eve_on, length_std_eve_on = [], []
 
-
 for ce in channel_errors:
     # Eve OFF
-    results_off = [simulate_bb84(n, sample_size, eve_active=False, channel_error=ce) for _ in range(runs)]
+    results_off = [simulate_bb84(n, sample_size, eve_active=False, channel_error=ce, p_eve=p_eve) for _ in range(runs)]
     errors_off = [r[0] for r in results_off]
     lengths_off = [r[1] for r in results_off]
     error_mean_eve_off.append(np.mean(errors_off))
@@ -109,10 +130,10 @@ for ce in channel_errors:
     length_mean_eve_off.append(np.mean(lengths_off))
     length_std_eve_off.append(np.std(lengths_off))
     if ce == channel_errors[-1]:
-        errors_off_final = errors_off  # salva per istogramma
+        errors_off_final = errors_off
 
     # Eve ON
-    results_on = [simulate_bb84(n, sample_size, eve_active=True, channel_error=ce) for _ in range(runs)]
+    results_on = [simulate_bb84(n, sample_size, eve_active=True, channel_error=ce, p_eve=p_eve) for _ in range(runs)]
     errors_on = [r[0] for r in results_on]
     lengths_on = [r[1] for r in results_on]
     error_mean_eve_on.append(np.mean(errors_on))
@@ -120,7 +141,7 @@ for ce in channel_errors:
     length_mean_eve_on.append(np.mean(lengths_on))
     length_std_eve_on.append(np.std(lengths_on))
     if ce == channel_errors[-1]:
-        errors_on_final = errors_on  # salva per istogramma
+        errors_on_final = errors_on
 
 
 # ---------------- GRAFICO 1: QBER ----------------
@@ -136,9 +157,8 @@ std_on = np.array(error_std_eve_on)
 plt.plot(channel_errors, mean_on, marker='o', label="Eve on")
 plt.fill_between(channel_errors, mean_on - std_on, mean_on + std_on, color='salmon', alpha=0.3)
 
-# Linee teoriche
 plt.plot(channel_errors, channel_errors, 'k--', label="QBER teorico (rumore)")
-plt.axhline(0.25, color='gray', linestyle=':', label="QBER teorico Eve (25%)")
+plt.axhline(0.25 * p_eve, color='gray', linestyle=':', label=f"QBER teorico Eve ({p_eve*100:.0f}%)")
 
 plt.xlabel("Probabilità di errore del canale")
 plt.ylabel("Errore medio stimato (QBER)")
@@ -168,6 +188,7 @@ plt.grid(True)
 plt.legend()
 plt.show()
 
+
 # ---------------- ISTOGRAMMI FINALI ----------------
 plt.figure(figsize=(12,5))
 
@@ -185,3 +206,21 @@ plt.ylabel("Frequenza")
 
 plt.tight_layout()
 plt.show()
+
+
+# ---------------- SALVATAGGIO RISULTATI ----------------
+with open("bb84_results.csv", mode="w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow(["channel_error",
+                     "mean_QBER_eve_off", "std_QBER_eve_off",
+                     "mean_QBER_eve_on", "std_QBER_eve_on",
+                     "mean_len_eve_off", "std_len_eve_off",
+                     "mean_len_eve_on", "std_len_eve_on"])
+    for i, ce in enumerate(channel_errors):
+        writer.writerow([ce,
+                         error_mean_eve_off[i], error_std_eve_off[i],
+                         error_mean_eve_on[i], error_std_eve_on[i],
+                         length_mean_eve_off[i], length_std_eve_off[i],
+                         length_mean_eve_on[i], length_std_eve_on[i]])
+
+print("\nRisultati salvati in 'bb84_results.csv'.")
