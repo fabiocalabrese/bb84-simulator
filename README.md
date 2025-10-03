@@ -136,6 +136,8 @@ Key observations from the simulation:
 
 
 ## Screenshots
+
+Simulation with the default parameters
 ![QBER](screenshots/QBER_before_after_correction.jpg)
 
 ![Sifted Key Length ](screenshots/sifted_key_length.jpg)
