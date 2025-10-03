@@ -143,7 +143,7 @@ def simulate_bb84(n, sample_size, eve_active=False, channel_error=0.0, p_eve=1.0
     key_length = len(alice_key)
 
 
-    corrected_bob_key = block_error_correction(alice_key, bob_key, num_blocks=20)
+    corrected_bob_key = block_error_correction(alice_key, bob_key, num_blocks=50)
     if len(alice_key) > 0:
         residual_error = np.mean(alice_key != corrected_bob_key)
     else:
@@ -232,11 +232,13 @@ plt.fill_between(channel_errors, mean_on - std_on, mean_on + std_on, color='salm
 # Errore residuo (dopo correzione)
 mean_res_off = np.array(residual_mean_eve_off)
 std_res_off = np.array(residual_std_eve_off)
-plt.plot(channel_errors, mean_res_off, marker='s', linestyle='--', label="Residuo Eve off (dopo correzione)")
+plt.plot(channel_errors, mean_res_off, marker='s', linestyle='--', color = 'red', label="Residuo Eve off (dopo correzione)")
+plt.fill_between(channel_errors, mean_res_off - std_res_off, mean_res_off + std_res_off, color='red', alpha=0.3)
 
 mean_res_on = np.array(residual_mean_eve_on)
 std_res_on = np.array(residual_std_eve_on)
-plt.plot(channel_errors, mean_res_on, marker='s', linestyle='--', label="Residuo Eve on (dopo correzione)")
+plt.plot(channel_errors, mean_res_on, marker='s', linestyle='--', color = 'green', label="Residuo Eve on (dopo correzione)")
+plt.fill_between(channel_errors, mean_res_on - std_res_on, mean_res_on + std_res_on, color='green', alpha=0.3)
 
 # Linee di riferimento teoriche
 plt.plot(channel_errors, channel_errors, 'k--', label="QBER teorico (rumore)")
@@ -276,20 +278,20 @@ plt.figure(figsize=(12,5))
 
 plt.subplot(1,2,1)
 plt.hist(errors_off_final, bins=30, color='skyblue', edgecolor='black')
-plt.title("Distribuzione errore Eve off (c.e = 0.2)")
+plt.title("Distribuzione errore Eve off (c.e = max)")
 plt.xlabel("Errore stimato")
 plt.ylabel("Frequenza")
 
 plt.subplot(1,2,2)
 plt.hist(errors_on_final, bins=30, color='salmon', edgecolor='black')
-plt.title("Distribuzione errore Eve on (c.e = 0.2)")
+plt.title("Distribuzione errore Eve on (c.e = max)")
 plt.xlabel("Errore stimato")
 plt.ylabel("Frequenza")
 
 plt.tight_layout()
 plt.show()
 
-"""
+
 # ---------------- SALVATAGGIO RISULTATI ----------------
 with open("bb84_results.csv", mode="w", newline="") as f:
     writer = csv.writer(f)
@@ -297,14 +299,18 @@ with open("bb84_results.csv", mode="w", newline="") as f:
                      "mean_QBER_eve_off", "std_QBER_eve_off",
                      "mean_QBER_eve_on", "std_QBER_eve_on",
                      "mean_len_eve_off", "std_len_eve_off",
-                     "mean_len_eve_on", "std_len_eve_on"])
+                     "mean_len_eve_on", "std_len_eve_on",
+                     "mean_residual_eve_off", "std_residual_eve_off",
+                     "mean_residual_eve_on", "std_residual_eve_on"])
+    
     for i, ce in enumerate(channel_errors):
         writer.writerow([ce,
                          error_mean_eve_off[i], error_std_eve_off[i],
                          error_mean_eve_on[i], error_std_eve_on[i],
                          length_mean_eve_off[i], length_std_eve_off[i],
-                         length_mean_eve_on[i], length_std_eve_on[i]])
+                         length_mean_eve_on[i], length_std_eve_on[i],
+                         residual_mean_eve_off[i], residual_std_eve_off[i],
+                         residual_mean_eve_on[i], residual_std_eve_on[i]])
 
 print("\nRisultati salvati in 'bb84_results.csv'.")
 
-"""
