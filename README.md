@@ -134,3 +134,10 @@ Key observations from the simulation:
 - To achieve higher error correction, it is necessary to **increase the number of blocks** used for block parity checks, i.e., create a finer division of the key.  
 - However, increasing the number of blocks slightly exposes more information publicly, requiring subsequent **privacy amplification** to ensure the security of the final key.
 
+
+## Screenshots
+![QBER](screenshot/QBER_before_after_correction.jpg)
+
+![Sifted Key Length ](screenshot/sifted_key_length.jpg)
+
+![Error Distribution](screenshot/error_distribution.jpg)
