@@ -72,6 +72,62 @@ def sample_and_estimate_error(alice_key, bob_key, sample_size):
     errors = np.sum(alice_sample != bob_sample)
     return errors / sample_size if sample_size > 0 else 0
 
+def binary_search_error(alice_block, bob_block):
+    """
+    Ricerca binaria dell'errore in un blocco.
+    Restituisce il bob_block corretto (modificato localmente).
+    """
+    n = len(alice_block)
+    if n == 0:
+        return bob_block
+
+    # Se le parità coincidono, non ci sono errori (o pari numero di errori)
+    if np.bitwise_xor.reduce(alice_block) == np.bitwise_xor.reduce(bob_block):
+        return bob_block
+
+    # Se siamo arrivati ad un singolo bit, correggilo
+    if n == 1:
+        bob_block[0] ^= 1
+        return bob_block
+
+    # Dividi a metà e controlla la parità della prima metà
+    mid = n // 2
+    alice_left, bob_left = alice_block[:mid], bob_block[:mid]
+    alice_right, bob_right = alice_block[mid:], bob_block[mid:]
+
+    if np.bitwise_xor.reduce(alice_left) != np.bitwise_xor.reduce(bob_left):
+        # L'errore è nella metà sinistra
+        corrected_left = binary_search_error(alice_left, bob_left)
+        return np.concatenate((corrected_left, bob_right))
+    else:
+        # L'errore è nella metà destra
+        corrected_right = binary_search_error(alice_right, bob_right)
+        return np.concatenate((bob_left, corrected_right))
+
+
+def block_error_correction(alice_key, bob_key, num_blocks=4):
+    """
+    Divide la chiave in num_blocks blocchi e applica la ricerca binaria
+    per correggere i blocchi con parità discordante.
+    Restituisce la chiave di Bob corretta.
+    """
+    n = len(alice_key)
+    corrected_bob = bob_key.copy()
+    block_size = max(1, n // num_blocks)
+
+    for start in range(0, n, block_size):
+        end = min(start + block_size, n)
+        alice_block = alice_key[start:end]
+        bob_block = corrected_bob[start:end]
+
+        # Se le parità differiscono, cerca e correggi
+        if np.bitwise_xor.reduce(alice_block) != np.bitwise_xor.reduce(bob_block):
+            corrected_block = binary_search_error(alice_block, bob_block)
+            corrected_bob[start:end] = corrected_block
+
+    return corrected_bob
+
+
 
 # ---------------- FUNZIONE DI SIMULAZIONE ----------------
 def simulate_bb84(n, sample_size, eve_active=False, channel_error=0.0, p_eve=1.0):
@@ -86,7 +142,14 @@ def simulate_bb84(n, sample_size, eve_active=False, channel_error=0.0, p_eve=1.0
     error_rate = sample_and_estimate_error(alice_key, bob_key, sample_size)
     key_length = len(alice_key)
 
-    return error_rate, key_length
+
+    corrected_bob_key = block_error_correction(alice_key, bob_key, num_blocks=20)
+    if len(alice_key) > 0:
+        residual_error = np.mean(alice_key != corrected_bob_key)
+    else:
+        residual_error = 0
+
+    return error_rate, key_length, residual_error
 
 
 # ---------------- SIMULAZIONE MULTIPLA ----------------
@@ -101,11 +164,11 @@ try:
     p_eve = float(input("Inserisci la frazione di intercettazione di Eve (es. 1.0 = 100%, 0.5 = 50%): "))
 except ValueError:
     print("Input non valido, si utilizzano parametri di default.")
-    n = 100
-    sample_size = 10
+    n = 2048
+    sample_size = 1024
     runs = 500
-    channel_errors = [0, 0.01, 0.05, 0.1, 0.2]
-    p_eve = 1.0
+    channel_errors = [0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.2]
+    p_eve = 0
 
 print(f"\nSimulazione pronta con i seguenti parametri:")
 print(f"- Numero di bit: {n}")
@@ -119,16 +182,21 @@ error_mean_eve_off, error_std_eve_off = [], []
 error_mean_eve_on, error_std_eve_on = [], []
 length_mean_eve_off, length_std_eve_off = [], []
 length_mean_eve_on, length_std_eve_on = [], []
+residual_mean_eve_off, residual_std_eve_off = [], []
+residual_mean_eve_on, residual_std_eve_on = [], []
 
 for ce in channel_errors:
     # Eve OFF
     results_off = [simulate_bb84(n, sample_size, eve_active=False, channel_error=ce, p_eve=p_eve) for _ in range(runs)]
     errors_off = [r[0] for r in results_off]
     lengths_off = [r[1] for r in results_off]
+    residuals_off = [r[2] for r in results_off]
     error_mean_eve_off.append(np.mean(errors_off))
     error_std_eve_off.append(np.std(errors_off))
     length_mean_eve_off.append(np.mean(lengths_off))
     length_std_eve_off.append(np.std(lengths_off))
+    residual_mean_eve_off.append(np.mean(residuals_off))
+    residual_std_eve_off.append(np.std(residuals_off))
     if ce == channel_errors[-1]:
         errors_off_final = errors_off
 
@@ -136,10 +204,13 @@ for ce in channel_errors:
     results_on = [simulate_bb84(n, sample_size, eve_active=True, channel_error=ce, p_eve=p_eve) for _ in range(runs)]
     errors_on = [r[0] for r in results_on]
     lengths_on = [r[1] for r in results_on]
+    residuals_on = [r[2] for r in results_on]
     error_mean_eve_on.append(np.mean(errors_on))
     error_std_eve_on.append(np.std(errors_on))
     length_mean_eve_on.append(np.mean(lengths_on))
     length_std_eve_on.append(np.std(lengths_on))
+    residual_mean_eve_on.append(np.mean(residuals_on))
+    residual_std_eve_on.append(np.std(residuals_on))
     if ce == channel_errors[-1]:
         errors_on_final = errors_on
 
@@ -147,22 +218,33 @@ for ce in channel_errors:
 # ---------------- GRAFICO 1: QBER ----------------
 plt.figure(figsize=(8, 5))
 
+# QBER stimato (prima della correzione)
 mean_off = np.array(error_mean_eve_off)
 std_off = np.array(error_std_eve_off)
-plt.plot(channel_errors, mean_off, marker='o', label="Eve off")
+plt.plot(channel_errors, mean_off, marker='o', label="QBER Eve off (prima correzione)")
 plt.fill_between(channel_errors, mean_off - std_off, mean_off + std_off, color='skyblue', alpha=0.3)
 
 mean_on = np.array(error_mean_eve_on)
 std_on = np.array(error_std_eve_on)
-plt.plot(channel_errors, mean_on, marker='o', label="Eve on")
+plt.plot(channel_errors, mean_on, marker='o', label="QBER Eve on (prima correzione)")
 plt.fill_between(channel_errors, mean_on - std_on, mean_on + std_on, color='salmon', alpha=0.3)
 
+# Errore residuo (dopo correzione)
+mean_res_off = np.array(residual_mean_eve_off)
+std_res_off = np.array(residual_std_eve_off)
+plt.plot(channel_errors, mean_res_off, marker='s', linestyle='--', label="Residuo Eve off (dopo correzione)")
+
+mean_res_on = np.array(residual_mean_eve_on)
+std_res_on = np.array(residual_std_eve_on)
+plt.plot(channel_errors, mean_res_on, marker='s', linestyle='--', label="Residuo Eve on (dopo correzione)")
+
+# Linee di riferimento teoriche
 plt.plot(channel_errors, channel_errors, 'k--', label="QBER teorico (rumore)")
 plt.axhline(0.25 * p_eve, color='gray', linestyle=':', label=f"QBER teorico Eve ({p_eve*100:.0f}%)")
 
 plt.xlabel("Probabilità di errore del canale")
-plt.ylabel("Errore medio stimato (QBER)")
-plt.title("QBER stimato nel BB84 in funzione del rumore del canale")
+plt.ylabel("Errore (QBER o residuo)")
+plt.title("QBER prima e dopo correzione nel BB84")
 plt.grid(True)
 plt.legend()
 plt.show()
@@ -207,7 +289,7 @@ plt.ylabel("Frequenza")
 plt.tight_layout()
 plt.show()
 
-
+"""
 # ---------------- SALVATAGGIO RISULTATI ----------------
 with open("bb84_results.csv", mode="w", newline="") as f:
     writer = csv.writer(f)
@@ -224,3 +306,5 @@ with open("bb84_results.csv", mode="w", newline="") as f:
                          length_mean_eve_on[i], length_std_eve_on[i]])
 
 print("\nRisultati salvati in 'bb84_results.csv'.")
+
+"""
