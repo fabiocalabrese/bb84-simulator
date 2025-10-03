@@ -1,7 +1,7 @@
 # BB84 Quantum Key Distribution Simulator
 
 Simulazione didattica del protocollo **BB84** in Python.  
-Questo repository contiene un’implementazione del protocollo con simulazioni statistiche, introduzione di rumore di canale e la possibilità di attivare un intercettatore (Eve).
+Questo repository contiene un’implementazione del protocollo con simulazioni statistiche, introduzione di rumore di canale, la possibilità di attivare un intercettatore (Eve), e un semplice algoritmo di **error correction**.
 
 **Autore:** Fabio Calabrese — `fabiocalabrese88@gmail.com`
 
@@ -15,7 +15,9 @@ Mostrare in modo pratico:
 - l’intercettazione di Eve (opzionale),
 - il sifting della chiave (conservando solo i bit con basi coincidenti),
 - la stima del **QBER** (Quantum Bit Error Rate) tramite campionamento,
-- l’analisi statistica (media e deviazione standard) del QBER e della lunghezza della chiave siftata in funzione del rumore di canale.
+- la correzione degli errori nella chiave siftata tramite **binary search a blocchi**,
+- la stima dell’**errore residuo dopo correzione**,
+- l’analisi statistica (media e deviazione standard) di QBER, lunghezza chiave e errore residuo in funzione del rumore di canale.
 
 ---
 
@@ -31,8 +33,12 @@ Il comportamento stocastico è generato con NumPy (`np.random.*`):
   - se la base non coincide, reinvia un bit casuale.  
 - **Sifting**: Alice e Bob confrontano le basi e conservano solo i bit coincidenti, producendo la chiave siftata.  
 - **Stima del QBER**: un campione casuale della chiave siftata viene confrontato per stimare la frazione di errori.  
+- **Error Correction**: la chiave siftata viene suddivisa in blocchi; per ciascun blocco si confronta la parità con Alice.  
+  - Se le parità differiscono, viene applicata una **ricerca binaria** sul blocco fino a identificare e correggere bit singoli errati.  
+  - L’operazione viene ripetuta per tutti i blocchi, producendo la chiave corretta di Bob.  
+- **Errore residuo**: calcolato come la frazione di bit ancora discordanti dopo la correzione.
 
-> La simulazione è di tipo Monte Carlo: ripetendo più run indipendenti si ottengono stime statistiche (medie e deviazioni standard) di QBER e lunghezza chiave.
+> La simulazione è di tipo Monte Carlo: ripetendo più run indipendenti si ottengono stime statistiche (medie e deviazioni standard) di QBER, lunghezza chiave e errore residuo.
 
 ---
 
@@ -44,6 +50,8 @@ Il comportamento stocastico è generato con NumPy (`np.random.*`):
   - intercettazione di Eve,
   - sifting della chiave,
   - calcolo QBER e lunghezza chiave,
+  - **correzione degli errori a blocchi**,
+  - calcolo errore residuo dopo correzione,
   - plotting dei risultati,
   - salvataggio dei dati in CSV.  
 
@@ -65,6 +73,10 @@ Colonne:
 - `std_len_eve_off` — deviazione standard della lunghezza (Eve off)  
 - `mean_len_eve_on` — lunghezza media chiave siftata (Eve on)  
 - `std_len_eve_on` — deviazione standard della lunghezza (Eve on)  
+- `mean_residual_eve_off` — errore residuo medio dopo correzione (Eve off)  
+- `std_residual_eve_off` — deviazione standard dell’errore residuo (Eve off)  
+- `mean_residual_eve_on` — errore residuo medio dopo correzione (Eve on)  
+- `std_residual_eve_on` — deviazione standard dell’errore residuo (Eve on)  
 
 ---
 
@@ -80,7 +92,6 @@ All’avvio, lo script richiede (con default se input non valido):
 Eve è attiva **sempre** nella parte “Eve on” della simulazione; la comparazione avviene fra scenario Eve off ed Eve on.
 
 ---
-
 ## Come eseguire
 
 1. Clona il repository:
@@ -105,13 +116,22 @@ Segui le richieste per l’inserimento dei parametri oppure lascia che il progra
 Lo script produce i seguenti grafici a video:
 
 - **QBER medio vs rumore di canale**  
-  (Eve off/on, con bande ± deviazione standard, e linee teoriche di riferimento).  
+  (Eve off/on, con bande ± deviazione standard, linee teoriche, e confronto con **errore residuo dopo correzione**).  
 
 - **Lunghezza media della chiave siftata vs rumore di canale**  
   (Eve off/on, con bande ± deviazione standard).  
 
 - **Istogrammi del QBER stimato**  
-  distribuzione degli errori sull’ultimo valore di channel_error simulato.
+  Distribuzione degli errori sull’ultimo valore di `channel_error` simulato.  
 
+---
 
+## Commenti
 
+Dalla simulazione si possono notare i seguenti punti chiave:
+
+- L’intervento di Eve al **100% della chiave** produce un QBER di circa **25%** anche senza rumore di canale.  
+- L’inclusione del rumore di canale aumenta ulteriormente il QBER totale.  
+- L’algoritmo di **error correction a blocchi** funziona correttamente: riduce l’errore residuo rispetto al QBER iniziale.  
+- Per ottenere una maggiore correzione degli errori, è necessario **aumentare il numero di blocchi** soggetti alla block parity, ovvero creare una suddivisione più fine della chiave.  
+- Tuttavia, aumentare il numero di blocchi espone maggiormente l’informazione pubblica e quindi richiede l’uso successivo di **privacy amplification** per garantire la sicurezza della chiave finale.
