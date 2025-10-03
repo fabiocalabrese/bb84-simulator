@@ -1,117 +1,136 @@
 # BB84 Quantum Key Distribution Simulator
 
-Simulazione didattica del protocollo **BB84** in Python.  
-Questo repository contiene un’implementazione del protocollo con simulazioni statistiche, introduzione di rumore di canale e la possibilità di attivare un intercettatore (Eve).
+Educational simulation of the **BB84** protocol in Python.  
+This repository contains an implementation of the protocol with statistical simulations, channel noise, optional eavesdropping (Eve), and a simple **error correction** algorithm.
 
-**Autore:** Fabio Calabrese — `fabiocalabrese88@gmail.com`
-
----
-
-## Obiettivo
-
-Mostrare in modo pratico:
-- la generazione casuale di bit e basi da parte di Alice,
-- la ricezione e misurazione da parte di Bob,
-- l’intercettazione di Eve (opzionale),
-- il sifting della chiave (conservando solo i bit con basi coincidenti),
-- la stima del **QBER** (Quantum Bit Error Rate) tramite campionamento,
-- l’analisi statistica (media e deviazione standard) del QBER e della lunghezza della chiave siftata in funzione del rumore di canale.
+**Author:** Fabio Calabrese — `fabiocalabrese88@gmail.com`
 
 ---
 
-## Metodo e criteri di simulazione
+## Objective
 
-Il comportamento stocastico è generato con NumPy (`np.random.*`):
-
-- **Bit**: `np.random.randint(0,2,size=n)` genera i bit di Alice.  
-- **Basi**: `np.random.randint(0,2,size=n)` genera le basi di Alice e Bob (e di Eve quando attiva).  
-- **Rumore di canale**: `np.random.rand(len(bits)) < error_prob` genera array booleani per decidere quali bit flippare, implementando una probabilità indipendente di errore per ciascun bit.  
-- **Intercettazione (Eve)**: se attiva, Eve sceglie basi casuali;  
-  - se la base coincide con quella di Alice, misura correttamente e reinvia il bit;  
-  - se la base non coincide, reinvia un bit casuale.  
-- **Sifting**: Alice e Bob confrontano le basi e conservano solo i bit coincidenti, producendo la chiave siftata.  
-- **Stima del QBER**: un campione casuale della chiave siftata viene confrontato per stimare la frazione di errori.  
-
-> La simulazione è di tipo Monte Carlo: ripetendo più run indipendenti si ottengono stime statistiche (medie e deviazioni standard) di QBER e lunghezza chiave.
+Demonstrate in practice:
+- random generation of bits and bases by Alice,
+- reception and measurement by Bob,
+- optional eavesdropping by Eve,
+- key sifting (keeping only bits with matching bases),
+- estimation of the **QBER** (Quantum Bit Error Rate) via sampling,
+- error correction of the sifted key using **block-based binary search**,
+- estimation of **residual error after correction**,
+- statistical analysis (mean and standard deviation) of QBER, key length, and residual error as a function of channel noise.
 
 ---
 
-## File principali
+## Simulation method
 
-- `bb84_alternative.py` — script principale con:
-  - generazione casuale dei bit/basi,
-  - rumore di canale,
-  - intercettazione di Eve,
-  - sifting della chiave,
-  - calcolo QBER e lunghezza chiave,
-  - plotting dei risultati,
-  - salvataggio dei dati in CSV.  
+The stochastic behavior is generated using NumPy (`np.random.*`):
+
+- **Bits**: `np.random.randint(0,2,size=n)` generates Alice’s bits.  
+- **Bases**: `np.random.randint(0,2,size=n)` generates the bases of Alice and Bob (and Eve when active).  
+- **Channel noise**: `np.random.rand(len(bits)) < error_prob` generates boolean arrays to decide which bits to flip, implementing an independent error probability for each bit.  
+- **Eavesdropping (Eve)**: if active, Eve chooses random bases;  
+  - if the basis matches Alice’s, she measures correctly and resends the bit;  
+  - if the basis does not match, she resends a random bit.  
+- **Sifting**: Alice and Bob compare their bases and keep only the matching bits, producing the sifted key.  
+- **QBER estimation**: a random sample of the sifted key is compared to estimate the fraction of errors.  
+- **Error Correction**: the sifted key is divided into blocks; for each block, the parity is compared with Alice.  
+  - If parities differ, a **binary search** is applied on the block to identify and correct single-bit errors.  
+  - This operation is repeated for all blocks, producing Bob’s corrected key.  
+- **Residual error**: calculated as the fraction of bits still mismatched after correction.
+
+> The simulation is Monte Carlo–type: repeating multiple independent runs produces statistical estimates (mean and standard deviation) of QBER, key length, and residual error.
 
 ---
 
-## Output salvato
+## Main files
 
-Alla fine della simulazione viene generato un file CSV:
+- `bb84_alternative.py` — main script including:
+  - random generation of bits/bases,
+  - channel noise,
+  - Eve interception,
+  - key sifting,
+  - QBER and key length calculation,
+  - **block-based error correction**,
+  - calculation of residual error after correction,
+  - plotting results,
+  - saving data to CSV.
+
+---
+
+## Saved output
+
+At the end of the simulation, a CSV file is generated:
 
 - **`bb84_results.csv`**  
 
-Colonne:
-- `channel_error` — probabilità di errore del canale  
-- `mean_QBER_eve_off` — QBER medio con Eve disattiva  
-- `std_QBER_eve_off` — deviazione standard QBER (Eve off)  
-- `mean_QBER_eve_on` — QBER medio con Eve attiva  
-- `std_QBER_eve_on` — deviazione standard QBER (Eve on)  
-- `mean_len_eve_off` — lunghezza media chiave siftata (Eve off)  
-- `std_len_eve_off` — deviazione standard della lunghezza (Eve off)  
-- `mean_len_eve_on` — lunghezza media chiave siftata (Eve on)  
-- `std_len_eve_on` — deviazione standard della lunghezza (Eve on)  
+Columns:
+- `channel_error` — channel error probability  
+- `mean_QBER_eve_off` — average QBER with Eve off  
+- `std_QBER_eve_off` — QBER standard deviation (Eve off)  
+- `mean_QBER_eve_on` — average QBER with Eve on  
+- `std_QBER_eve_on` — QBER standard deviation (Eve on)  
+- `mean_len_eve_off` — average sifted key length (Eve off)  
+- `std_len_eve_off` — key length standard deviation (Eve off)  
+- `mean_len_eve_on` — average sifted key length (Eve on)  
+- `std_len_eve_on` — key length standard deviation (Eve on)  
+- `mean_residual_eve_off` — average residual error after correction (Eve off)  
+- `std_residual_eve_off` — standard deviation of residual error (Eve off)  
+- `mean_residual_eve_on` — average residual error after correction (Eve on)  
+- `std_residual_eve_on` — standard deviation of residual error (Eve on)  
 
 ---
 
-## Parametri principali
+## Main parameters
 
-All’avvio, lo script richiede (con default se input non valido):
+At startup, the script asks for (defaults used if input is invalid):
 
-- `n` — numero di bit per run (default: 100)  
-- `sample_size` — numero di bit per stimare l’errore (default: 10)  
-- `runs` — numero di run Monte Carlo per ciascun `channel_error` (default: 500)  
-- `channel_errors` — valori di probabilità di errore del canale (default: `0,0.01,0.05,0.1,0.2`)  
-
-Eve è attiva **sempre** nella parte “Eve on” della simulazione; la comparazione avviene fra scenario Eve off ed Eve on.
-
+- `n` — number of bits per run (default: 2048)  
+- `sample_size` — number of bits for error estimation (default: 1024)  
+- `runs` — Monte Carlo runs per `channel_error` (default: 500)  
+- `channel_errors` — channel error probability values (default: `0, 0.01, 0.02, ... ,0.19, 0.2`)  
+- `p_eve` — Eve's interception probability (default: 0.2)
 ---
 
-## Come eseguire
+## How to run
 
-1. Clona il repository:
+Clone the repository:
 ```bash
 git clone https://github.com/fabiocalabrese/bb84-simulator.git
 cd bb84-simulator
 ```
-Installa le dipendenze:
+Install dependencies:
 ```
 pip install numpy matplotlib
 ```
-
-Lancia lo script:
+Launch the script:
 ```
 python bb84_alternative.py
 ```
 
-Segui le richieste per l’inserimento dei parametri oppure lascia che il programma usi i valori di default.
+Follow the prompts to enter parameters, or use the default values.
 
-## Grafici generati
+## Generated plots
 
-Lo script produce i seguenti grafici a video:
+The script produces the following plots:
 
-- **QBER medio vs rumore di canale**  
-  (Eve off/on, con bande ± deviazione standard, e linee teoriche di riferimento).  
+- **Average QBER vs channel noise**  
+  (Eve off/on, with ± standard deviation bands, theoretical lines, and comparison with **residual error after correction**).  
 
-- **Lunghezza media della chiave siftata vs rumore di canale**  
-  (Eve off/on, con bande ± deviazione standard).  
+- **Average sifted key length vs channel noise**  
+  (Eve off/on, with ± standard deviation bands).  
 
-- **Istogrammi del QBER stimato**  
-  distribuzione degli errori sull’ultimo valore di channel_error simulato.
+- **Histograms of estimated QBER**  
+  Distribution of errors for the last simulated `channel_error` value.
 
+---
 
+## Comments
+
+Key observations from the simulation:
+
+- Eve’s intervention on **100% of the key** produces a QBER of about **25%** even without channel noise.  
+- Adding channel noise further increases the total QBER.  
+- The **block-based error correction algorithm** works correctly, reducing residual error compared to the initial QBER.  
+- To achieve higher error correction, it is necessary to **increase the number of blocks** used for block parity checks, i.e., create a finer division of the key.  
+- However, increasing the number of blocks slightly exposes more information publicly, requiring subsequent **privacy amplification** to ensure the security of the final key.
 
