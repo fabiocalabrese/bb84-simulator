@@ -136,8 +136,8 @@ Key observations from the simulation:
 
 
 ## Screenshots
-![QBER](screenshot/QBER_before_after_correction.jpg)
+![QBER](screenshots/QBER_before_after_correction.jpg)
 
-![Sifted Key Length ](screenshot/sifted_key_length.jpg)
+![Sifted Key Length ](screenshots/sifted_key_length.jpg)
 
-![Error Distribution](screenshot/error_distribution.jpg)
+![Error Distribution](screenshots/error_distribution.jpg)
