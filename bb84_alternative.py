@@ -156,7 +156,7 @@ bb84_banner()
 
 try:
     n = int(input("Enter number of bits per run (e.g., 100): "))
-    sample_size = int(input("Enter sample size for error estimation (e.g., 10): "))
+    sample_size = int(input("Enter sample size for error estimation (e.g., 2048): "))
     runs = int(input("Enter number of runs per channel_error (e.g., 500): "))
     channel_errors_input = input("Enter channel_error values separated by comma (e.g., 0,0.01,0.05): ")
     channel_errors = [float(x.strip()) for x in channel_errors_input.split(",")]
