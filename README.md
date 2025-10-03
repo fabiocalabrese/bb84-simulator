@@ -87,7 +87,7 @@ At startup, the script asks for (defaults used if input is invalid):
 - `n` — number of bits per run (default: 2048)  
 - `sample_size` — number of bits for error estimation (default: 1024)  
 - `runs` — Monte Carlo runs per `channel_error` (default: 500)  
-- `channel_errors` — channel error probability values (default: `0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.2`)  
+- `channel_errors` — channel error probability values (default: `0, 0.01, 0.02, ... ,0.19, 0.2`)  
 - `p_eve` — Eve's interception probability (default: 0.2)
 ---
 
