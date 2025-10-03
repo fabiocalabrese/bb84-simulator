@@ -135,4 +135,9 @@ Key observations from the simulation:
 - However, increasing the number of blocks slightly exposes more information publicly, requiring subsequent **privacy amplification** to ensure the security of the final key.
 
 
-[https://github.com/fabiocalabrese/bb84-simulator/edit/main/screenshot/QBER_before_after_correction.jpg]
+## Screenshots
+![QBER](screenshot/QBER_before_after_correction.jpg)
+
+![Sifted Key Length ](screenshot/sifted_key_length.jpg)
+
+![Error Distribution](screenshot/error_distribution.jpg)
