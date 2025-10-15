@@ -134,7 +134,9 @@ Key observations from the simulation:
 - To achieve higher error correction, it is necessary to **increase the number of blocks** used for block parity checks, i.e., create a finer division of the key.  
 - However, increasing the number of blocks slightly exposes more information publicly, requiring subsequent **privacy amplification** to ensure the security of the final key.
 
-
+## References
+- Quantum Cryptography coursework notes
+- Quantum communication and network coursework notes
 ## Screenshots
 
 Simulation with the default parameters
@@ -143,3 +145,4 @@ Simulation with the default parameters
 ![Sifted Key Length ](screenshots/sifted_key_length.jpg)
 
 ![Error Distribution](screenshots/error_distribution.jpg)
+
